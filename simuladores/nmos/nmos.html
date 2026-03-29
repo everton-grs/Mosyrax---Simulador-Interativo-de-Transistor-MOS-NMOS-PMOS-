@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório Virtual de Transistor NMOS</title>
+    <script type="text/javascript" src="https://me.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=lhzDqNPQV73C948kpNOXvmTN9BQOAq3y3gCg0KiX75NLKd7lv6g1It-YFuCF3j4wnpDqMbY5SSnXIYpGl1k0gXqbwXGldQyxhWKnHvP_VoQGBG4l8K6IKo9aYZSw3Y1nXRAGJZTq6KaidPUZMPDe9R_Ek4Xkif7hYLqpVAaFYVU" charset="UTF-8"></script><script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .katex { font-size: 1.1em; }
+        :root {
+            --gate-color: #ef4444; /* red-500 */
+            --oxide-color: #f1f5f9; /* slate-100 */
+            --field-oxide-color: #ffedd5; /* orange-100 */
+            --substrate-color: #fefce8; /* yellow-50 */
+            --n-plus-color: #a3e635; /* lime-400 */
+            --channel-color: #60a5fa; /* blue-400 */
+            --depletion-color: #e0e7ff; /* indigo-100 */
+            --metal-color: #9ca3af; /* gray-400 */
+            --text-color: #475569; /* slate-600 */
+            --line-color: #334155; /* slate-700 */
+        }
+        #channel-poly, #depletion-rect, #conventional-current-arrow, #gate, #oxide,
+        #source-n-plus, #drain-n-plus, #field-oxide-left, #field-oxide-right,
+        #source-metal-contact, #drain-metal-contact, #source-metal-line, #drain-metal-line,
+        #source-ground, #conventional-current-arrow {
+            transition: all 0.3s ease-in-out;
+        }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        #vth-marker {
+            pointer-events: none;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.6); opacity: 1; }
+        }
+        .pulsing-glow {
+            animation: pulse 1.5s infinite ease-in-out;
+            transform-origin: center;
+        }
+        .svg-text, .svg-label, .svg-label-light {
+            font-family: 'Inter', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            transition: x 0.3s ease-in-out, y 0.3s ease-in-out;
+        }
+        .svg-text { font-size: 14px; fill: var(--text-color); }
+        .svg-label { font-size: 12px; fill: var(--text-color); }
+        .svg-label-light { font-size: 12px; fill: white; }
+        .svg-line {
+            stroke: var(--line-color);
+            stroke-width: 2;
+            transition: all 0.3s ease-in-out;
+        }
+        .charge {
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            user-select: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .electron { fill: #3b82f6; } /* blue */
+        .ion { fill: #f43f5e; } /* rose */
+        .formula-box {
+            background-color: #f8fafc; /* slate-50 */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-family: 'Fira Code', monospace;
+            transition: all 0.3s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 140px; /* Garante altura mínima para as fórmulas */
+        }
+        .formula-box.active {
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-blue-600">MOSYRAX - Simulador Interativo de Transistor NMOS</h1>
+            <p class="text-slate-600 mt-2">Explore a física, a modelagem matemática e o funcionamento de transistores MOS em tempo real</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Coluna da Simulação -->
+            <div class="flex flex-col space-y-6">
+                <!-- Diagrama do Transistor -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <h2 class="text-xl font-semibold mb-4 text-center">Diagrama Físico do NMOS</h2>
+                    <div id="transistor-diagram-container" class="w-full h-96 relative">
+                        <svg id="transistor-svg" viewBox="0 0 500 340" preserveAspectRatio="xMidYMid meet" class="w-full h-full">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--line-color)" />
+                                </marker>
+                            </defs>
+                            <!-- Componentes Físicos -->
+                            <rect x="0" y="160" width="500" height="140" fill="var(--substrate-color)" />
+                            <!-- Óxido de Campo -->
+                            <rect id="field-oxide-left" x="0" y="150" width="150" height="10" fill="var(--field-oxide-color)" />
+                            <rect id="field-oxide-right" x="350" y="150" width="150" height="10" fill="var(--field-oxide-color)" />
+                            
+                            <!-- Regiões N+ (retângulos) -->
+                            <rect id="source-n-plus" x="0" y="160" width="150" height="80" fill="var(--n-plus-color)" />
+                            <rect id="drain-n-plus" x="350" y="160" width="150" height="80" fill="var(--n-plus-color)" />
+
+                            <!-- Região de Depleção (controlada por JS) -->
+                            <rect id="depletion-rect" x="150" y="160" width="200" height="0" fill="var(--depletion-color)" />
+                            
+                            <!-- Canal (controlado por JS) -->
+                            <polygon id="channel-poly" points="150,160 350,160 350,160 150,160" fill="var(--channel-color)" opacity="0" />
+
+                            <!-- Grupo para íons fixos na depleção -->
+                            <g id="fixed-ions-group"></g>
+
+                            <!-- Grupo para elétrons no canal -->
+                            <g id="channel-electrons-group"></g>
+
+                            <!-- Camadas Centrais -->
+                            <rect id="gate" x="150" y="130" width="200" height="20" fill="var(--gate-color)" />
+                            <rect id="oxide" x="150" y="150" width="200" height="10" fill="var(--oxide-color)" stroke="#a0aec0" stroke-width="0.5" />
+                            
+                            <!-- Contatos Metálicos e Linhas -->
+                            <rect id="source-metal-contact" x="50" y="155" width="50" height="5" fill="var(--metal-color)" />
+                            <rect id="drain-metal-contact" x="400" y="155" width="50" height="5" fill="var(--metal-color)" />
+                            <rect id="gate-contact" x="225" y="125" width="50" height="5" fill="var(--metal-color)" />
+                            <line id="gate-line" x1="250" y1="125" x2="250" y2="40" class="svg-line" />
+                            <line id="source-metal-line" x1="75" y1="155" x2="75" y2="80" class="svg-line" />
+                            <line id="drain-metal-line" x1="425" y1="155" x2="425" y2="80" class="svg-line" />
+
+                            <!-- Seta da Corrente Convencional ID -->
+                            <g id="conventional-current-arrow" style="opacity: 0;">
+                                <line x1="425" y1="100" x2="425" y2="140" class="svg-line" marker-end="url(#arrowhead)" />
+                                <text x="435" y="120" class="svg-label" font-weight="bold">I<tspan dy="5" font-size="0.7em">D</tspan></text>
+                            </g>
+
+                            <!-- Símbolos de Terra -->
+                            <g id="source-ground">
+                                <line x1="75" y1="80" x2="75" y2="95" class="svg-line" />
+                                <line x1="60" y1="95" x2="90" y2="95" class="svg-line" />
+                                <line x1="65" y1="100" x2="85" y2="100" class="svg-line" />
+                                <line x1="70" y1="105" x2="80" y2="105" class="svg-line" />
+                            </g>
+                            <g id="bulk-ground">
+                                <line x1="250" y1="300" x2="250" y2="320" class="svg-line" />
+                                <line x1="235" y1="320" x2="265" y2="320" class="svg-line" />
+                                <line x1="240" y1="325" x2="260" y2="325" class="svg-line" />
+                                <line x1="245" y1="330" x2="255" y2="330" class="svg-line" />
+                            </g>
+                            
+                            <!-- Efeito Pinch-off -->
+                            <circle id="pinch-off-effect-svg" cx="350" cy="165" r="8" fill="rgba(251, 191, 36, 0.8)" class="hidden" />
+
+                            <!-- Camada de Texto (deve ser o último elemento para ficar por cima de tudo) -->
+                            <g id="text-labels-layer">
+                                <text id="vg-label" x="250" y="30" class="svg-text" font-weight="bold" fill="#c53030" text-anchor="middle">+ V<tspan dy="5" font-size="0.7em">GS</tspan></text>
+                                <text id="vd-label" x="450" y="75" class="svg-text" font-weight="bold" fill="#2f855a" text-anchor="middle">+ V<tspan dy="5" font-size="0.7em">DS</tspan></text>
+                                <text id="source-text-label" x="75" y="200" class="svg-label" text-anchor="middle">N+<tspan x="75" dy="14">(Fonte)</tspan></text>
+                                <text id="drain-text-label" x="425" y="200" class="svg-label" text-anchor="middle">N+<tspan x="425" dy="14">(Dreno)</tspan></text>
+                                <text x="250" y="280" class="svg-label" font-weight="bold" text-anchor="middle">Substrato Poço (P)</text>
+                                <text x="260" y="315" class="svg-label" text-anchor="start">Bulk (B)</text>
+                                <text id="gate-label" x="250" y="142" class="svg-label-light" text-anchor="middle">Porta (Gate)</text>
+                                <text id="oxide-label" x="250" y="157" class="svg-label" text-anchor="middle" font-size="9px">Óxido de Gate</text>
+                                <text id="source-field-oxide-label" x="75" y="145" class="svg-label" text-anchor="middle" font-size="9px">Óxido de Campo</text>
+                                <text id="drain-field-oxide-label" x="425" y="145" class="svg-label" text-anchor="middle" font-size="9px">Óxido de Campo</text>
+                                <!-- Label de Comprimento do Canal movido para baixo -->
+                                <text id="channel-length-label" x="250" y="195" class="svg-label" text-anchor="middle" fill="#1e40af">L (Comprimento)</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Controles -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <h2 class="text-xl font-semibold mb-4">Controles Interativos</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div>
+                            <label for="vg-slider" class="flex justify-between items-center font-medium">
+                                <span>Tensão <span class="font-mono">V<sub>GS</sub></span></span>
+                                <span id="vg-value" class="font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded-md">1.00 V</span>
+                            </label>
+                            <div class="relative pt-2">
+                                <input id="vg-slider" type="range" min="0" max="5" value="1" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                                <div id="vth-marker" class="absolute top-0 h-full w-1 bg-amber-500 rounded-full" title="Tensão de Limiar (Vth = 1.0V)"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="vd-slider" class="flex justify-between items-center font-medium">
+                                <span>Tensão <span class="font-mono">V<sub>DS</sub></span></span>
+                                <span id="vd-value" class="font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded-md">0.00 V</span>
+                            </label>
+                            <input id="vd-slider" type="range" min="0" max="5" value="0" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div>
+                            <label for="kn-slider" class="flex justify-between items-center font-medium">
+                                <span><span class="font-mono">k'<sub>n</sub> (&micro;<sub>n</sub>C<sub>ox</sub>)</span></span>
+                                <span id="kn-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">100 µA/V²</span>
+                            </label>
+                            <input id="kn-slider" type="range" min="20" max="200" value="100" step="1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div>
+                            <label for="lambda-base-slider" class="flex justify-between items-center font-medium">
+                                <span>Fator Lambda (λ')</span>
+                                <span id="lambda-base-value" class="font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded-md">0.05</span>
+                            </label>
+                            <input id="lambda-base-slider" type="range" min="0" max="0.2" value="0.05" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                         <div>
+                            <label for="w-slider" class="flex justify-between items-center font-medium">
+                                <span>Largura do Canal (W)</span>
+                                <span id="w-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">2.0</span>
+                            </label>
+                            <input id="w-slider" type="range" min="0.5" max="10" value="2" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div>
+                            <label for="l-slider" class="flex justify-between items-center font-medium">
+                                <span>Comprimento do Canal (L)</span>
+                                <span id="l-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">1.0</span>
+                            </label>
+                            <input id="l-slider" type="range" min="0.5" max="5" value="1" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div class="md:col-span-2">
+                             <label class="flex justify-between items-center font-medium">
+                                <span>Lambda (λ) Calculado</span>
+                                <span id="lambda-value" class="font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded-md">0.05 V<sup>-1</sup></span>
+                            </label>
+                            <p class="text-xs text-slate-500 mt-1">λ é calculado como λ'/L</p>
+                        </div>
+                        <div class="md:col-span-2 text-center text-sm text-slate-500 pt-2">
+                            <p>Tensão da Fonte (V<sub>S</sub>) = 0V. Tensão de Limiar (V<sub>th</sub>) = 1.0V.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna do Gráfico -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 flex flex-col">
+                <h2 class="text-xl font-semibold mb-4 text-center">Curva Característica (I<sub>D</sub> vs V<sub>DS</sub>)</h2>
+                <div class="relative flex-grow min-h-[300px]">
+                    <canvas id="iv-chart"></canvas>
+                </div>
+                <div id="status-card" class="p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6">
+                    <h3 class="text-lg font-semibold">Modo de Operação</h3>
+                    <p id="mode" class="text-2xl font-bold uppercase tracking-wider mt-1">CORTE</p>
+                    <div class="mt-4">
+                        <span class="font-medium">Corrente de Dreno (I<sub>D</sub>):</span>
+                        <span id="id-current" class="font-mono ml-2 text-lg">0.00 µA</span>
+                    </div>
+                    <div id="ro-container" class="mt-2">
+                        <span class="font-medium">Resistência de Saída (r<sub>o</sub>):</span>
+                        <span id="ro-value" class="font-mono ml-2 text-lg">N/A</span>
+                    </div>
+                    <div id="ron-container" class="mt-2 hidden">
+                        <span class="font-medium">Resistência de Condução (R<sub>on</sub>):</span>
+                        <span id="ron-value" class="font-mono ml-2 text-lg">N/A</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelagem Matemática -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                <h2 class="text-2xl font-bold text-center mb-6 text-slate-700">Modelagem Matemática e Modos de Operação</h2>
+                <p class="text-center text-slate-600 mb-6">A corrente de dreno (<span class="font-mono">I<sub>D</sub></span>) é determinada pelas tensões aplicadas e pelos parâmetros físicos do dispositivo. As equações abaixo, baseadas no modelo de Razavi, descrevem o comportamento do transistor.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Corte -->
+                    <div id="corte-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Modo de Corte</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Quando <span class="font-mono">V<sub>GS</sub></span> é menor que a tensão de limiar <span class="font-mono">V<sub>th</sub></span>, não há elétrons suficientes para formar um canal condutor entre a fonte e o dreno. O transistor está <strong>desligado</strong> e a corrente é (idealmente) zero, agindo como um interruptor aberto.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="corte-cond"></span></div>
+                        <div id="corte-formula" class="formula-box"><span id="corte-eq"></span></div>
+                    </div>
+                    <!-- Triodo -->
+                    <div id="triodo-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Modo Triodo (ou Linear)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Com <span class="font-mono">V<sub>GS</sub></span> > <span class="font-mono">V<sub>th</sub></span>, um canal é formado. Se <span class="font-mono">V<sub>DS</sub></span> for relativamente baixo, o canal se mantém contínuo e a corrente aumenta com <span class="font-mono">V<sub>DS</sub></span>. O transistor está <strong>ligado</strong> e age como um resistor controlado pela tensão <span class="font-mono">V<sub>GS</sub></span>.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="triodo-cond"></span></div>
+                        <div id="triodo-formula" class="formula-box"><span id="triodo-eq"></span></div>
+                    </div>
+                    <!-- Saturação -->
+                    <div id="saturacao-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Modo de Saturação</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Quando <span class="font-mono">V<sub>DS</sub></span> aumenta a ponto de a tensão no dreno ser <span class="font-mono">V<sub>GS</sub> - V<sub>th</sub></span>, o canal se estrangula no dreno (<strong>pinch-off</strong>). A corrente se torna quase independente de <span class="font-mono">V<sub>DS</sub></span> e é controlada principalmente por <span class="font-mono">V<sub>GS</sub></span>. Age como uma fonte de corrente controlada.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="saturacao-cond"></span></div>
+                        <div id="saturacao-formula" class="formula-box"><span id="saturacao-eq"></span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                        <h4 class="font-bold text-orange-800 text-center text-lg">Resistência de Saída (r<sub>o</sub>)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Na saturação, a modulação do comprimento do canal causa um pequeno aumento em I<sub>D</sub> com V<sub>DS</sub>. Isso resulta em uma resistência de saída finita, r<sub>o</sub>, que caracteriza o quão ideal é a fonte de corrente.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div class="formula-box flex-col !mt-0">
+                                <p class="text-sm text-slate-500 mb-2">Definição Formal</p>
+                                <span id="ro-def-eq"></span>
+                            </div>
+                            <div class="formula-box flex-col !mt-0">
+                                <p class="text-sm text-slate-500 mb-2">Aproximação Prática</p>
+                                <span id="ro-approx-eq"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                        <h4 class="font-bold text-teal-800 text-center text-lg">Resistência de Condução (R<sub>on</sub>)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Na região de triodo, para V<sub>DS</sub> pequeno, o transistor se comporta como um resistor. O valor dessa resistência, R<sub>on</sub>, é controlado por V<sub>GS</sub> e é um parâmetro chave em aplicações de chaveamento.</p>
+                        <div class="formula-box flex-col">
+                             <p class="text-sm text-slate-500 mb-2">Para V<sub>DS</sub> pequeno</p>
+                            <span id="ron-eq"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Explicações Detalhadas -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                 <h2 class="text-2xl font-bold text-center mb-6 text-slate-700">Anatomia e Física do Transistor NMOS</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <h4 class="font-bold text-yellow-800">1. Substrato (Corpo / Bulk)</h4>
+                        <p class="text-slate-600 mt-1">É a base de <strong>Silício tipo-P</strong>, dopado com impurezas (ex: Boro) que criam "lacunas" (ausência de elétrons), agindo como portadores de carga positiva. É o alicerce onde o transistor é construído.</p>
+                    </div>
+                    <div class="bg-lime-50 p-4 rounded-lg border border-lime-200">
+                        <h4 class="font-bold text-lime-800">2. Fonte (Source) e Dreno (Drain)</h4>
+                        <p class="text-slate-600 mt-1">São duas regiões de <strong>Silício tipo-N</strong>, fortemente dopadas (indicado por N+) com impurezas (ex: Fósforo) que fornecem um excesso de elétrons livres (portadores de carga negativa). A Fonte é o terminal que "fornece" os elétrons para o canal, e o Dreno é o que os "drena" ou coleta.</p>
+                    </div>
+                    <div class="bg-slate-100 p-4 rounded-lg border border-slate-200">
+                        <h4 class="font-bold text-slate-800">3. Óxido de Gate (Dielétrico)</h4>
+                        <p class="text-slate-600 mt-1">Uma camada ultrafina de <strong>Dióxido de Silício (SiO₂)</strong>, um excelente isolante elétrico, é depositada sobre o substrato, entre a fonte e o dreno. Sua função é isolar a Porta do canal, permitindo que um campo elétrico seja estabelecido sem que haja fluxo de corrente para a Porta.</p>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <h4 class="font-bold text-red-800">4. Porta (Gate)</h4>
+                        <p class="text-slate-600 mt-1">Um material <strong>condutor</strong> (geralmente Polisilício) depositado sobre o óxido. A tensão aplicada aqui (<span class="font-mono">V<sub>GS</sub></span>) cria um campo elétrico vertical através do óxido, que controla a formação e a condutividade do "canal" de elétrons no substrato logo abaixo.</p>
+                    </div>
+                </div>
+                <div class="mt-8 bg-sky-50 p-4 rounded-lg border border-sky-200">
+                    <h4 class="font-bold text-sky-800 text-center text-lg">Definição dos Parâmetros das Equações</h4>
+                    <ul class="list-disc list-inside text-slate-600 mt-2 space-y-2">
+                        <li><span class="font-mono"><b>V<sub>GS</sub></b></span>: Tensão Gate-Fonte. É a tensão de controle que determina a formação do canal de elétrons.</li>
+                        <li><span class="font-mono"><b>V<sub>DS</sub></b></span>: Tensão Dreno-Fonte. Cria o campo elétrico horizontal que impulsiona os elétrons da fonte para o dreno, gerando a corrente <span class="font-mono">I<sub>D</sub></span>.</li>
+                        <li><span class="font-mono"><b>V<sub>th</sub></b></span>: Tensão de Limiar (Threshold). A <span class="font-mono">V<sub>GS</sub></span> mínima para criar o canal de condução (inversão forte).</li>
+                        <li><span class="font-mono"><b>&micro;<sub>n</sub>C<sub>ox</sub></b></span>: Também conhecido como <span class="font-mono">k'<sub>n</sub></span>, é o parâmetro de transcondutância do processo, que depende de:
+                            <ul class="list-['-_'] ml-6">
+                                <li><span class="font-mono"><b>&micro;<sub>n</sub></b></span>: Mobilidade dos elétrons no canal (quão facilmente se movem).</li>
+                                <li><span class="font-mono"><b>C<sub>ox</sub></b></span>: Capacitância do óxido de gate por unidade de área (<span id="cox-formula"></span>). Depende da permissividade do dielétrico (<span class="font-mono">&epsilon;<sub>ox</sub></span>) e da espessura do óxido (<span class="font-mono">t<sub>ox</sub></span>).</li>
+                            </ul>
+                        </li>
+                        <li><span class="font-mono"><b>W/L</b></span>: Razão entre a Largura (W) e o Comprimento (L) do canal. É o principal fator de projeto para controlar a capacidade de condução de corrente do transistor.</li>
+                        <li><span class="font-mono"><b>&lambda;</b></span>: Coeficiente de Modulação do Comprimento do Canal. Modela o aumento da corrente de dreno com <span class="font-mono">V<sub>DS</sub></span> na saturação. Um <span class="font-mono">&lambda;</span> menor indica um comportamento mais próximo de uma fonte de corrente ideal.</li>
+                         <li><span class="font-mono"><b>r<sub>o</sub></b></span>: Resistência de saída de pequeno sinal. É uma consequência direta da modulação do comprimento do canal (<span class="font-mono">&lambda;</span>). Um <span class="font-mono">r<sub>o</sub></span> alto é desejável para amplificadores de alto ganho.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Elementos do DOM ---
+        const vgSlider = document.getElementById('vg-slider');
+        const vdSlider = document.getElementById('vd-slider');
+        const knSlider = document.getElementById('kn-slider');
+        const wSlider = document.getElementById('w-slider');
+        const lSlider = document.getElementById('l-slider');
+        const lambdaBaseSlider = document.getElementById('lambda-base-slider');
+        
+        const vgValue = document.getElementById('vg-value');
+        const vdValue = document.getElementById('vd-value');
+        const knValue = document.getElementById('kn-value');
+        const wValue = document.getElementById('w-value');
+        const lValue = document.getElementById('l-value');
+        const lambdaBaseValue = document.getElementById('lambda-base-value');
+        const lambdaValue = document.getElementById('lambda-value');
+
+        const modeText = document.getElementById('mode');
+        const currentText = document.getElementById('id-current');
+        const roValue = document.getElementById('ro-value');
+        const ronValue = document.getElementById('ron-value');
+        const roContainer = document.getElementById('ro-container');
+        const ronContainer = document.getElementById('ron-container');
+        const statusCard = document.getElementById('status-card');
+        const vthMarker = document.getElementById('vth-marker');
+        const chartCanvas = document.getElementById('iv-chart');
+
+        // --- Elementos do SVG ---
+        const gateSvg = document.getElementById('gate');
+        const oxideSvg = document.getElementById('oxide');
+        const gateContactSvg = document.getElementById('gate-contact');
+        const gateLineSvg = document.getElementById('gate-line');
+        const vgLabelSvg = document.getElementById('vg-label');
+        const gateLabelSvg = document.getElementById('gate-label');
+        const oxideLabelSvg = document.getElementById('oxide-label');
+        const channelLengthLabelSvg = document.getElementById('channel-length-label');
+        const depletionRect = document.getElementById('depletion-rect');
+        const channelPoly = document.getElementById('channel-poly');
+        const pinchOffEffectSvg = document.getElementById('pinch-off-effect-svg');
+        const fixedIonsGroup = document.getElementById('fixed-ions-group');
+        const channelElectronsGroup = document.getElementById('channel-electrons-group');
+        const conventionalCurrentArrow = document.getElementById('conventional-current-arrow');
+        const sourceNPlus = document.getElementById('source-n-plus');
+        const drainNPlus = document.getElementById('drain-n-plus');
+        const fieldOxideLeft = document.getElementById('field-oxide-left');
+        const fieldOxideRight = document.getElementById('field-oxide-right');
+        const sourceMetalContact = document.getElementById('source-metal-contact');
+        const drainMetalContact = document.getElementById('drain-metal-contact');
+        const sourceMetalLine = document.getElementById('source-metal-line');
+        const drainMetalLine = document.getElementById('drain-metal-line');
+        const sourceGround = document.getElementById('source-ground');
+        const sourceTextLabel = document.getElementById('source-text-label');
+        const drainTextLabel = document.getElementById('drain-text-label');
+        const vdLabel = document.getElementById('vd-label');
+        const sourceFieldOxideLabel = document.getElementById('source-field-oxide-label');
+        const drainFieldOxideLabel = document.getElementById('drain-field-oxide-label');
+
+        // --- Elementos de Explicação ---
+        const expCorte = document.getElementById('corte-exp');
+        const expTriodo = document.getElementById('triodo-exp');
+        const expSaturacao = document.getElementById('saturacao-exp');
+        const formulaCorte = document.getElementById('corte-formula');
+        const formulaTriodo = document.getElementById('triodo-formula');
+        const formulaSaturacao = document.getElementById('saturacao-formula');
+        const explanations = [expCorte, expTriodo, expSaturacao];
+        const formulas = [formulaCorte, formulaTriodo, formulaSaturacao];
+
+        const V_th = 1.0;
+        let ivChart;
+        let animationFrameId;
+
+        // --- Geração de Cargas ---
+        const NUM_IONS = 40;
+        const NUM_ELECTRONS = 50;
+        const ions = [];
+        const electrons = [];
+
+        function renderAllFormulas() {
+            katex.render('V_{GS} < V_{th}', document.getElementById('corte-cond'));
+            katex.render('I_D = 0', document.getElementById('corte-eq'));
+            
+            katex.render('V_{DS} < V_{GS} - V_{th}', document.getElementById('triodo-cond'));
+            katex.render('I_D = \\mu_n C_{ox} \\frac{W}{L} \\left[ (V_{GS} - V_{th})V_{DS} - \\frac{V_{DS}^2}{2} \\right](1+\\lambda V_{DS})', document.getElementById('triodo-eq'));
+
+            katex.render('V_{DS} \\geq V_{GS} - V_{th}', document.getElementById('saturacao-cond'));
+            katex.render('I_D = \\frac{1}{2} \\mu_n C_{ox} \\frac{W}{L} (V_{GS} - V_{th})^2 (1 + \\lambda V_{DS})', document.getElementById('saturacao-eq'));
+            
+            katex.render('C_{ox} = \\frac{\\epsilon_{ox}}{t_{ox}}', document.getElementById('cox-formula'));
+
+            katex.render('r_O = \\left( \\frac{\\partial I_D}{\\partial V_{DS}} \\right)^{-1}', document.getElementById('ro-def-eq'));
+            katex.render('r_O \\approx \\frac{1}{\\lambda I_D}', document.getElementById('ro-approx-eq'));
+            katex.render('R_{on} = \\frac{1}{\\mu_n C_{ox} \\frac{W}{L}(V_{GS} - V_{th})}', document.getElementById('ron-eq'));
+        }
+
+        function createCharges() {
+            for (let i = 0; i < NUM_IONS; i++) {
+                const ion = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                ion.setAttribute('class', 'charge ion');
+                ion.textContent = '+';
+                ion.style.opacity = '0';
+                fixedIonsGroup.appendChild(ion);
+                ions.push(ion);
+            }
+            for (let i = 0; i < NUM_ELECTRONS; i++) {
+                const electron = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                electron.setAttribute('class', 'charge electron');
+                electron.textContent = '–';
+                electron.style.opacity = '0';
+                channelElectronsGroup.appendChild(electron);
+                electrons.push({
+                    element: electron,
+                    x: 0,
+                    y: 0,
+                    speed: Math.random() * 1.5 + 0.5
+                });
+            }
+        }
+
+        function initializeChart() {
+            const ctx = chartCanvas.getContext('2d');
+            ivChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Curva I-V', data: [], borderColor: 'rgb(59, 130, 246)', borderWidth: 3, tension: 0.1, pointRadius: 0,
+                    }, {
+                        label: 'Ponto de Operação', data: [], borderColor: 'rgb(239, 68, 68)', backgroundColor: 'rgb(239, 68, 68)', pointRadius: 6, pointHoverRadius: 8, type: 'scatter'
+                    }, {
+                        label: 'Vdsat', data: [], borderColor: 'rgb(250, 204, 21)', borderWidth: 2, borderDash: [6, 6], pointRadius: 0, fill: false,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'linear', position: 'bottom', title: { display: true, text: 'V_DS (V)', font: { size: 14 } }, min: 0, max: 5 },
+                        y: { title: { display: true, text: 'I_D (µA)', font: { size: 14 } }, beginAtZero: true }
+                    },
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            labels: {
+                                filter: (legendItem) => legendItem.datasetIndex !== 1, // Hide operating point from legend
+                                font: { size: 12 }
+                            }
+                        } 
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+        }
+        
+        function updateVthMarker() {
+            const percent = (V_th / vgSlider.max) * 100;
+            vthMarker.style.left = `calc(${percent}% - 2px)`;
+        }
+
+        function updateChartData(Vg, Vd, current, kn_prime, W_L, lambda) {
+            const Vov = Vg - V_th;
+            const curveData = [];
+            const K_n = kn_prime * W_L;
+
+            if (Vov > 0) {
+                for (let vds_step = 0; vds_step <= 5; vds_step += 0.05) {
+                    let ids;
+                    if (vds_step < Vov) { // Triodo
+                        ids = K_n * (Vov * vds_step - 0.5 * vds_step * vds_step) * (1 + lambda * vds_step);
+                    } else { // Saturação
+                        ids = 0.5 * K_n * Vov * Vov * (1 + lambda * vds_step);
+                    }
+                    curveData.push({x: vds_step, y: ids});
+                }
+            }
+            
+            ivChart.data.datasets[0].data = curveData;
+            ivChart.data.datasets[1].data = [{x: Vd, y: current}];
+            
+            const Vdsat = Math.max(0, Vov);
+            const saturationCurrentAtMaxVd = (Vov > 0) ? (0.5 * K_n * Vov * Vov) * (1 + lambda * 5) : 0;
+            const maxY = Math.max(saturationCurrentAtMaxVd * 1.2, 20);
+            ivChart.options.scales.y.max = maxY;
+
+            if (Vov > 0) {
+                ivChart.data.datasets[2].data = [{x: Vdsat, y: 0}, {x: Vdsat, y: maxY}];
+            } else {
+                ivChart.data.datasets[2].data = [];
+            }
+
+            ivChart.update('none');
+        }
+
+        function updateSimulation() {
+            const Vg = parseFloat(vgSlider.value);
+            const Vd = parseFloat(vdSlider.value);
+            const kn_prime = parseFloat(knSlider.value);
+            const W = parseFloat(wSlider.value);
+            const L = parseFloat(lSlider.value);
+            const lambda_base = parseFloat(lambdaBaseSlider.value);
+            
+            const W_L = W / L;
+            const lambda = lambda_base / L;
+
+            vgValue.textContent = `${Vg.toFixed(2)} V`;
+            vdValue.textContent = `${Vd.toFixed(2)} V`;
+            knValue.textContent = `${kn_prime.toFixed(0)} µA/V²`;
+            wValue.textContent = `${W.toFixed(1)}`;
+            lValue.textContent = `${L.toFixed(1)}`;
+            lambdaBaseValue.textContent = `${lambda_base.toFixed(2)}`;
+            lambdaValue.textContent = `${lambda.toFixed(3)} V⁻¹`;
+
+            let mode = '';
+            let current = 0;
+            const Vov = Vg - V_th;
+            const K_n = kn_prime * W_L;
+            
+            roContainer.classList.add('hidden');
+            ronContainer.classList.add('hidden');
+
+            if (Vov <= 0) {
+                mode = 'CORTE';
+                current = 0;
+                roValue.textContent = 'N/A';
+                ronValue.textContent = 'N/A';
+                roContainer.classList.remove('hidden');
+                updateVisuals(mode, Vg, 0, 0, L);
+            } else {
+                if (Vd < Vov) {
+                    mode = 'TRIODO';
+                    current = K_n * (Vov * Vd - 0.5 * Vd * Vd) * (1 + lambda * Vd);
+                    
+                    const ron_ohms = 1 / (kn_prime * 1e-6 * W_L * Vov);
+                    ronValue.textContent = `${(ron_ohms).toFixed(2)} Ω`;
+                    ronContainer.classList.remove('hidden');
+
+                    const pinchOffRatio = Vd / Vov;
+                    updateVisuals(mode, Vg, 1, pinchOffRatio, L, current);
+                } else {
+                    mode = 'SATURAÇÃO';
+                    current = 0.5 * K_n * Vov * Vov * (1 + lambda * Vd);
+                    
+                    let ro = 'N/A';
+                    if (lambda > 0 && current > 1e-3) {
+                        const ro_ohms = 1 / (lambda * (current / 1e6));
+                        ro = `${(ro_ohms / 1000).toFixed(2)} kΩ`;
+                    } else if (lambda === 0) {
+                        ro = '∞';
+                    }
+                    roValue.textContent = ro;
+                    roContainer.classList.remove('hidden');
+
+                    updateVisuals(mode, Vg, 1, 1, L, current);
+                }
+            }
+
+            modeText.textContent = mode;
+            currentText.textContent = `${current.toFixed(2)} µA`;
+            updateChartData(Vg, Vd, current, kn_prime, W_L, lambda);
+        }
+        
+        function updateVisuals(mode, Vg, channelStrength, pinchOffRatio, L, current = 0) {
+            const baseL_visual = 200; 
+            const minL_visual = 50;  
+            const maxL_visual = 300; 
+            const newL_visual = maxL_visual - (L - lSlider.min) / (lSlider.max - lSlider.min) * (maxL_visual - minL_visual);
+            const xOffset = (500 - newL_visual) / 2;
+
+            // Região Central
+            gateSvg.setAttribute('x', xOffset);
+            gateSvg.setAttribute('width', newL_visual);
+            oxideSvg.setAttribute('x', xOffset);
+            oxideSvg.setAttribute('width', newL_visual);
+            depletionRect.setAttribute('x', xOffset);
+            depletionRect.setAttribute('width', newL_visual);
+            
+            gateContactSvg.setAttribute('x', xOffset + newL_visual/2 - 25);
+            gateLineSvg.setAttribute('x1', xOffset + newL_visual/2);
+            gateLineSvg.setAttribute('x2', xOffset + newL_visual/2);
+            vgLabelSvg.setAttribute('x', xOffset + newL_visual/2);
+            gateLabelSvg.setAttribute('x', xOffset + newL_visual/2);
+            oxideLabelSvg.setAttribute('x', xOffset + newL_visual/2);
+            channelLengthLabelSvg.setAttribute('x', xOffset + newL_visual/2);
+
+            // Regiões Laterais
+            const sourceWidth = xOffset;
+            const drainStartX = xOffset + newL_visual;
+            const drainWidth = 500 - drainStartX;
+
+            sourceNPlus.setAttribute('width', sourceWidth);
+            drainNPlus.setAttribute('x', drainStartX);
+            drainNPlus.setAttribute('width', drainWidth);
+
+            fieldOxideLeft.setAttribute('width', sourceWidth);
+            fieldOxideRight.setAttribute('x', drainStartX);
+            fieldOxideRight.setAttribute('width', drainWidth);
+
+            const sourceCenterX = sourceWidth / 2;
+            sourceMetalContact.setAttribute('x', sourceCenterX - 25);
+            sourceMetalLine.setAttribute('x1', sourceCenterX);
+            sourceMetalLine.setAttribute('x2', sourceCenterX);
+            sourceGround.setAttribute('transform', `translate(${sourceCenterX - 75}, 0)`);
+            sourceTextLabel.setAttribute('x', sourceCenterX);
+            sourceTextLabel.querySelector('tspan').setAttribute('x', sourceCenterX);
+            sourceFieldOxideLabel.setAttribute('x', sourceCenterX);
+
+            const drainCenterX = drainStartX + (drainWidth / 2);
+            drainMetalContact.setAttribute('x', drainCenterX - 25);
+            drainMetalLine.setAttribute('x1', drainCenterX);
+            drainMetalLine.setAttribute('x2', drainCenterX);
+            vdLabel.setAttribute('x', drainCenterX + 25);
+            drainTextLabel.setAttribute('x', drainCenterX);
+            drainTextLabel.querySelector('tspan').setAttribute('x', drainCenterX);
+            drainFieldOxideLabel.setAttribute('x', drainCenterX);
+            conventionalCurrentArrow.setAttribute('transform', `translate(${drainCenterX - 425}, 0)`);
+
+            // --- Atualização do Canal e Depleção ---
+            const maxDepletionHeight = 30;
+            const depletionHeight = Math.min(maxDepletionHeight, Vg * 15);
+            depletionRect.setAttribute('height', depletionHeight);
+
+            channelPoly.style.opacity = channelStrength;
+            const channelMaxHeight = 10; 
+            const sourceSideHeight = channelMaxHeight;
+            const drainSideHeight = channelMaxHeight * (1 - pinchOffRatio);
+            const points = `${xOffset},160 ${xOffset + newL_visual},160 ${xOffset + newL_visual},${160 + drainSideHeight} ${xOffset},${160 + sourceSideHeight}`;
+            channelPoly.setAttribute('points', points);
+
+            // --- Atualização das Cargas ---
+            ions.forEach((ion, i) => {
+                if (i < NUM_IONS * (depletionHeight / maxDepletionHeight) && Vg > 0.1) {
+                    const x = xOffset + 10 + Math.random() * (newL_visual - 20);
+                    const y = 170 + Math.random() * (depletionHeight - 10);
+                    ion.setAttribute('x', x);
+                    ion.setAttribute('y', y);
+                    ion.style.opacity = '1';
+                } else {
+                    ion.style.opacity = '0';
+                }
+            });
+
+            const Vov = Vg - V_th;
+            const electronDensity = Vov > 0 ? Math.min(1, Vov / 2.0) : 0;
+            electrons.forEach((e, i) => {
+                 if (i < NUM_ELECTRONS * electronDensity) {
+                    if (current === 0 || e.x === 0) { // Posiciona se não estiver animando
+                        const y_pos = 162 + Math.random() * (sourceSideHeight - 4);
+                        const x_pos = xOffset + 5 + Math.random() * (newL_visual - 10);
+                        e.element.setAttribute('x', x_pos);
+                        e.element.setAttribute('y', y_pos);
+                        e.x = x_pos;
+                        e.y = y_pos;
+                    }
+                    e.element.style.opacity = '1';
+                } else {
+                    e.element.style.opacity = '0';
+                    e.x = 0; // Reseta a posição para reposicionamento
+                }
+            });
+            
+            // --- Animação e UI ---
+            cancelAnimationFrame(animationFrameId);
+            if (current > 0.1) {
+                conventionalCurrentArrow.style.opacity = '1';
+                const animateCurrent = () => {
+                    electrons.forEach(e => {
+                        if (e.element.style.opacity === '1') {
+                            e.x += e.speed * (current / 50); 
+                            if (e.x > (xOffset + newL_visual - 5)) {
+                                e.x = xOffset + 5; // Volta para a fonte
+                            }
+                            e.element.setAttribute('x', e.x);
+                        }
+                    });
+                    animationFrameId = requestAnimationFrame(animateCurrent);
+                };
+                animateCurrent();
+            } else {
+                conventionalCurrentArrow.style.opacity = '0';
+            }
+
+            explanations.forEach(exp => exp.classList.remove('border-blue-500', 'bg-blue-50', 'shadow-md'));
+            formulas.forEach(form => form.classList.remove('active'));
+            pinchOffEffectSvg.classList.add('hidden');
+            pinchOffEffectSvg.classList.remove('pulsing-glow');
+
+            switch (mode) {
+                case 'CORTE':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-slate-500';
+                    expCorte.classList.add('border-blue-500', 'bg-blue-50', 'shadow-md');
+                    formulaCorte.classList.add('active');
+                    break;
+                case 'TRIODO':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-green-500';
+                    expTriodo.classList.add('border-blue-500', 'bg-blue-50', 'shadow-md');
+                    formulaTriodo.classList.add('active');
+                    break;
+                case 'SATURAÇÃO':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-red-500';
+                    expSaturacao.classList.add('border-blue-500', 'bg-blue-50', 'shadow-md');
+                    formulaSaturacao.classList.add('active');
+                    pinchOffEffectSvg.setAttribute('cx', xOffset + newL_visual);
+                    pinchOffEffectSvg.classList.remove('hidden');
+                    pinchOffEffectSvg.classList.add('pulsing-glow');
+                    break;
+            }
+        }
+
+        // --- Event Listeners ---
+        [vgSlider, vdSlider, knSlider, wSlider, lSlider, lambdaBaseSlider].forEach(slider => {
+            slider.addEventListener('input', updateSimulation);
+        });
+        window.addEventListener('resize', updateVthMarker);
+
+        // --- Chamada Inicial ---
+        window.onload = () => {
+            renderAllFormulas();
+            createCharges();
+            initializeChart();
+            updateVthMarker();
+            updateSimulation();
+        };
+    </script>
+
+</body>
+</html>
